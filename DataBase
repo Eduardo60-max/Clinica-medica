@@ -1,0 +1,305 @@
+-- BANCO DE DADOS: CLINICA MEDICA
+-- PostgreSQL 
+
+-- 1. TABELAS DE PESSOAS 
+
+
+CREATE TABLE IF NOT EXISTS Medico (
+    ID SERIAL PRIMARY KEY,
+    Nome VARCHAR(100) NOT NULL,
+    Telefone VARCHAR(20),
+    CRM VARCHAR(30) UNIQUE NOT NULL,
+    Especialidade VARCHAR(50),
+    Salario NUMERIC(10,2)
+);
+
+CREATE TABLE IF NOT EXISTS Funcionario (
+    ID SERIAL PRIMARY KEY,
+    Nome VARCHAR(100) NOT NULL,
+    Telefone VARCHAR(20),
+    CPF VARCHAR(20) UNIQUE NOT NULL,
+    Cargo VARCHAR(50),
+    Salario NUMERIC(10,2)
+);
+
+CREATE TABLE IF NOT EXISTS Paciente (
+    ID SERIAL PRIMARY KEY,
+    Nome VARCHAR(100) NOT NULL,
+    Idade INT,
+    Sexo CHAR(1),
+    MedicoID INT NOT NULL, 
+    
+    CONSTRAINT fk_paciente_medico
+        FOREIGN KEY (MedicoID) 
+        REFERENCES Medico(ID) 
+        ON DELETE RESTRICT 
+);
+
+
+-- 2. TABELAS DE ATENDIMENTO E REGISTRO
+
+
+CREATE TABLE IF NOT EXISTS Atendimento (
+    ID SERIAL PRIMARY KEY,
+    MedicoID INT NOT NULL,
+    PacienteID INT NOT NULL,
+    Descricao TEXT,
+    Tipo VARCHAR(50),
+    Preco NUMERIC(10,2),
+    DataHora TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    
+    CONSTRAINT fk_atendimento_medico
+        FOREIGN KEY (MedicoID) 
+        REFERENCES Medico(ID) 
+        ON DELETE RESTRICT,
+        
+    CONSTRAINT fk_atendimento_paciente
+        FOREIGN KEY (PacienteID) 
+        REFERENCES Paciente(ID) 
+        ON DELETE RESTRICT
+);
+
+CREATE TABLE IF NOT EXISTS Prontuario (
+    ID SERIAL PRIMARY KEY,
+    PacienteID INT NOT NULL,
+    MedicoID INT NOT NULL,
+    Descricao TEXT,
+    DataRegistro DATE DEFAULT CURRENT_DATE,
+    
+    CONSTRAINT fk_prontuario_paciente
+        FOREIGN KEY (PacienteID) 
+        REFERENCES Paciente(ID) 
+        ON DELETE CASCADE, 
+        
+    CONSTRAINT fk_prontuario_medico
+        FOREIGN KEY (MedicoID) 
+        REFERENCES Medico(ID) 
+        ON DELETE RESTRICT
+);
+
+
+-- 3. TABELAS DE AGENDA E TRANSAÇÃO
+
+
+CREATE TABLE IF NOT EXISTS Agenda (
+    ID SERIAL PRIMARY KEY,
+    FuncionarioID INT NOT NULL,
+    AtendimentoID INT NOT NULL,
+    DataAgenda TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    
+    CONSTRAINT fk_agenda_funcionario
+        FOREIGN KEY (FuncionarioID) 
+        REFERENCES Funcionario(ID) 
+        ON DELETE RESTRICT,
+        
+    CONSTRAINT fk_agenda_atendimento
+        FOREIGN KEY (AtendimentoID) 
+        REFERENCES Atendimento(ID) 
+        ON DELETE CASCADE, 
+        
+    
+    CONSTRAINT uq_agenda_atendimento UNIQUE (AtendimentoID)
+);
+
+
+CREATE TABLE IF NOT EXISTS Transacao (
+    ID SERIAL PRIMARY KEY,
+    AtendimentoID INT NOT NULL,
+    Preco NUMERIC(10,2),
+    Tipo_Pagamento VARCHAR(50),
+    
+    CONSTRAINT fk_transacao_atendimento
+        FOREIGN KEY (AtendimentoID) 
+        REFERENCES Atendimento(ID) 
+        ON DELETE RESTRICT
+);
+
+
+-- 4. TABELAS DE ESTOQUE E PRODUTO 
+
+
+CREATE TABLE IF NOT EXISTS Produto (
+    ID SERIAL PRIMARY KEY,
+    Nome VARCHAR(100) NOT NULL,
+    Descricao TEXT,
+    Preco NUMERIC(10,2) NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS Estoque (
+    ID SERIAL PRIMARY KEY,
+    ProdutoID INT NOT NULL,
+    Quantidade INT DEFAULT 0,
+    Localizacao VARCHAR(50),
+    
+    CONSTRAINT fk_estoque_produto
+        FOREIGN KEY (ProdutoID) 
+        REFERENCES Produto(ID) 
+        ON DELETE CASCADE
+);
+
+
+-- 5. TABELA DE RELACIONAMENTO (Transação <-> Produto)
+
+
+CREATE TABLE IF NOT EXISTS Transacao_Produto (
+    TransacaoID INT NOT NULL,
+    ProdutoID INT NOT NULL,
+    Quantidade INT DEFAULT 1,
+    
+    PRIMARY KEY (TransacaoID, ProdutoID),
+    
+    CONSTRAINT fk_transproduto_transacao
+        FOREIGN KEY (TransacaoID) 
+        REFERENCES Transacao(ID) 
+        ON DELETE CASCADE, 
+        
+    CONSTRAINT fk_transproduto_produto
+        FOREIGN KEY (ProdutoID) 
+        REFERENCES Produto(ID) 
+        ON DELETE RESTRICT
+);
+
+
+
+-- 1. iNDICES PARA MELHORAR PERFORMANCE 
+
+
+-- Tabela Medico
+CREATE INDEX idx_medico_crm ON Medico(CRM);
+CREATE INDEX idx_medico_especialidade ON Medico(Especialidade);
+
+-- Tabela Paciente
+CREATE INDEX idx_paciente_medico ON Paciente(MedicoID);
+
+-- Tabela Prontuario
+CREATE INDEX idx_prontuario_paciente ON Prontuario(PacienteID); 
+CREATE INDEX idx_prontuario_medico ON Prontuario(MedicoID);     
+CREATE INDEX idx_prontuario_data ON Prontuario(DataRegistro);
+
+-- Tabela Atendimento
+CREATE INDEX idx_atendimento_medico ON Atendimento(MedicoID);   
+CREATE INDEX idx_atendimento_paciente ON Atendimento(PacienteID); 
+CREATE INDEX idx_atendimento_datahora ON Atendimento(DataHora);
+
+-- Tabela Funcionario
+CREATE INDEX idx_funcionario_cpf ON Funcionario(CPF);
+CREATE INDEX idx_funcionario_cargo ON Funcionario(Cargo);
+
+-- Tabela Transacao
+CREATE INDEX idx_transacao_atendimento ON Transacao(AtendimentoID); 
+CREATE INDEX idx_transacao_tipo_pagamento ON Transacao(Tipo_Pagamento);
+
+-- Tabela Agenda
+CREATE INDEX idx_agenda_funcionario ON Agenda(FuncionarioID);   
+CREATE INDEX idx_agenda_atendimento ON Agenda(AtendimentoID);     
+CREATE INDEX idx_agenda_data ON Agenda(DataAgenda);
+
+-- Tabela Produto
+CREATE INDEX idx_produto_nome ON Produto(Nome);
+
+-- Tabela Estoque
+CREATE INDEX idx_estoque_produto ON Estoque(ProdutoID); 
+
+-- Tabela Transacao_Produto 
+CREATE INDEX idx_transproduto_produto ON Transacao_Produto(ProdutoID);
+
+
+
+
+-- 2. CONSTRAINTS ADICIONAIS DE VALIDAÇÃO
+
+
+-- Tabela Medico
+ALTER TABLE Medico
+ADD CONSTRAINT chk_medico_salario_positivo CHECK (Salario >= 0);
+
+-- Tabela Paciente
+ALTER TABLE Paciente
+ADD CONSTRAINT chk_paciente_idade_positiva CHECK (Idade >= 0),
+ADD CONSTRAINT chk_paciente_sexo_valido CHECK (Sexo IN ('M', 'F', 'O')); 
+
+-- Tabela Funcionario
+ALTER TABLE Funcionario
+ADD CONSTRAINT chk_funcionario_salario_positivo CHECK (Salario >= 0);
+
+-- Tabela Atendimento
+ALTER TABLE Atendimento
+ADD CONSTRAINT chk_atendimento_preco_positivo CHECK (Preco >= 0);
+
+-- Tabela Produto
+ALTER TABLE Produto
+ADD CONSTRAINT chk_produto_preco_positivo CHECK (Preco > 0);
+
+-- Tabela Estoque
+ALTER TABLE Estoque
+ADD CONSTRAINT chk_estoque_quantidade_nao_negativa CHECK (Quantidade >= 0);
+
+-- Tabela Transacao
+ALTER TABLE Transacao
+ADD CONSTRAINT chk_transacao_preco_positivo CHECK (Preco >= 0);
+
+
+
+
+-- 3. TRIGGERS (VALIDAÇÃO E FUNCIONALIDADR)
+
+
+
+CREATE OR REPLACE FUNCTION validar_idade_paciente()
+RETURNS TRIGGER AS $$
+BEGIN
+    IF NEW.Idade IS NOT NULL AND (NEW.Idade < 0 OR NEW.Idade > 110) THEN
+        RAISE EXCEPTION 'A idade do paciente deve ser um valor razoável (entre 0 e 110 anos).';
+    END IF;
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+
+CREATE TRIGGER trigger_validar_idade_paciente
+    BEFORE INSERT OR UPDATE ON Paciente
+    FOR EACH ROW
+    EXECUTE FUNCTION validar_idade_paciente();
+
+
+
+CREATE OR REPLACE FUNCTION atualizar_estoque_transacao_produto()
+RETURNS TRIGGER AS $$
+DECLARE
+    v_produto_id INT;
+    v_quantidade_movimentada INT;
+BEGIN
+    -
+    IF (TG_OP = 'INSERT') THEN
+        v_produto_id := NEW.ProdutoID;
+        v_quantidade_movimentada := NEW.Quantidade * -1;
+    ELSIF (TG_OP = 'DELETE') THEN
+        v_produto_id := OLD.ProdutoID;    
+        v_quantidade_movimentada := OLD.Quantidade;
+    ELSE
+        
+        RETURN NULL; 
+    END IF;
+
+    
+    UPDATE Estoque
+    SET Quantidade = Quantidade + v_quantidade_movimentada
+    WHERE ProdutoID = v_produto_id;
+
+    
+    IF NOT FOUND THEN
+        RAISE EXCEPTION 'Erro: Produto com ID % não encontrado na tabela Estoque.', v_produto_id;
+    END IF;
+
+    
+    RETURN NULL;
+END;
+$$ LANGUAGE plpgsql;
+
+
+-- TRIGGER: Aciona a transação
+
+CREATE TRIGGER trigger_controle_estoque
+AFTER INSERT OR DELETE ON Transacao_Produto
+FOR EACH ROW
+EXECUTE FUNCTION atualizar_estoque_transacao_produto();

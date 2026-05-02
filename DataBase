@@ -93,7 +93,7 @@ CREATE TABLE IF NOT EXISTS Atendimento (
         
     CONSTRAINT chk_atendimento_status
         CHECK (Status IN ('ATIVO', 'CANCELADO', 'CONCLUIDO')),
-    CONSTRAINT uq_atendimento_agendamento UNIQUE (AgendamentoID)
+    CONSTRAINT uq_atendimento_agendamento (AgendamentoID)
 );
 
 CREATE TABLE IF NOT EXISTS Prontuario (
